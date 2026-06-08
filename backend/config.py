@@ -9,9 +9,19 @@ AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 DATABASE_URL = f"sqlite:///{DB_PATH}"
 
-SPEECH_RECOGNITION_ENGINE = "google"
-TTS_ENGINE = "gtts"
+SPEECH_RECOGNITION_ENGINE = "whisper"
+WHISPER_MODEL_SIZE = "base"
+
+# TTS engine: "vibevoice" | "elevenlabs" | "coqui"
+TTS_ENGINE = os.getenv("TTS_ENGINE", "elevenlabs")
 TTS_LANG = "en"
+
+# ElevenLabs
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+ELEVENLABS_VOICE_ID = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+
+# VibeVoice
+VIBEVOICE_MODEL_PATH = os.getenv("VIBEVOICE_MODEL_PATH", "microsoft/vibevoice-1.5B")
 
 SENTIMENT_MODEL = "distilbert-base-uncased-finetuned-sst-2-english"
 EMOTION_MODEL = "bhadresh-savani/bert-base-uncased-emotion"
