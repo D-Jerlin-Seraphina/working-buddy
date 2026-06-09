@@ -17,19 +17,21 @@ sys.path.insert(0, ROOT)
 
 
 def run_api():
-    print("🚀 Starting FastAPI backend on http://localhost:8000")
+    print("[+] Starting FastAPI backend on http://localhost:8000")
     print("   Docs: http://localhost:8000/docs\n")
     subprocess.run([
         sys.executable, "-m", "uvicorn",
         "backend.main:app",
         "--host", "0.0.0.0",
         "--port", "8000",
-        "--reload"
+        "--reload",
+        "--timeout-keep-alive", "300",
+        "--timeout-graceful-shutdown", "300"
     ], cwd=ROOT)
 
 
 def run_dashboard():
-    print("📊 Starting Streamlit dashboard on http://localhost:8501\n")
+    print("[+] Starting Streamlit dashboard on http://localhost:8501\n")
     subprocess.run([
         sys.executable, "-m", "streamlit", "run",
         "dashboard/app.py",
@@ -38,10 +40,10 @@ def run_dashboard():
 
 
 def run_setup(n_employees: int = 50):
-    print("🗄️  Initializing database...\n")
+    print("[+] Initializing database...\n")
     from backend.utils.database import init_db
     init_db()
-    print("  ✓ Database tables created")
+    print("  [OK] Database tables created")
     subprocess.run([
         sys.executable, "-m", "data.generate_synthetic",
         "--employees", str(n_employees)

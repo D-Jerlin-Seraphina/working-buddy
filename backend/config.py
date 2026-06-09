@@ -12,8 +12,8 @@ DATABASE_URL = f"sqlite:///{DB_PATH}"
 SPEECH_RECOGNITION_ENGINE = "whisper"
 WHISPER_MODEL_SIZE = "base"
 
-# TTS engine: "vibevoice" | "elevenlabs" | "coqui"
-TTS_ENGINE = os.getenv("TTS_ENGINE", "elevenlabs")
+# TTS engine: "vibevoice" | "elevenlabs" | "speecht5" | "coqui"
+TTS_ENGINE = os.getenv("TTS_ENGINE", "speecht5")
 TTS_LANG = "en"
 
 # ElevenLabs

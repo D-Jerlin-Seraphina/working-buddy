@@ -87,7 +87,7 @@ def generate_employees(n: int, db) -> list:
     db.commit()
     for emp in employees:
         db.refresh(emp)
-    print(f"  ✓ Created {len(employees)} employees")
+    print(f"  [OK] Created {len(employees)} employees")
     return employees
 
 
@@ -136,7 +136,7 @@ def generate_conversations(employees: list, db) -> None:
             db.add(conv)
             count += 1
     db.commit()
-    print(f"  ✓ Created {count} conversations")
+    print(f"  [OK] Created {count} conversations")
 
 
 def generate_risk_assessments(employees: list, db) -> None:
@@ -186,7 +186,7 @@ def generate_risk_assessments(employees: list, db) -> None:
                     is_resolved=random.choice([True, False, False])
                 ))
     db.commit()
-    print(f"  ✓ Created {count} risk assessments")
+    print(f"  [OK] Created {count} risk assessments")
 
 
 def main():
@@ -196,14 +196,14 @@ def main():
     args = parser.parse_args()
 
     random.seed(args.seed)
-    print(f"\n🚀 Generating synthetic data ({args.employees} employees)...\n")
+    print(f"\n[+] Generating synthetic data ({args.employees} employees)...\n")
 
     init_db()
     db = SessionLocal()
     try:
         existing = db.query(Employee).count()
         if existing > 0:
-            print(f"  ⚠️  Database already has {existing} employees.")
+            print(f"  [!] Database already has {existing} employees.")
             print("  Delete data/retention.db to regenerate.")
             return
 
@@ -211,7 +211,7 @@ def main():
         generate_conversations(employees, db)
         generate_risk_assessments(employees, db)
 
-        print(f"\n✅ Done! Populated data/retention.db")
+        print(f"\n[OK] Done! Populated data/retention.db")
         print("   Start API:       uvicorn backend.main:app --reload")
         print("   Start dashboard: streamlit run dashboard/app.py")
     finally:

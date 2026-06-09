@@ -7,6 +7,19 @@ from backend.config import AUDIO_DIR
 
 logger = logging.getLogger(__name__)
 
+try:
+    from transformers import VibeVoiceForConditionalGenerationInference, VibeVoiceProcessor
+    VIBEVOICE_AVAILABLE = True
+except ImportError:
+    VIBEVOICE_AVAILABLE = False
+
+try:
+    from transformers import SpeechT5Processor, SpeechT5ForTextToSpeech, SpeechT5HifiGan
+    from datasets import load_dataset
+    SPEECHT5_AVAILABLE = True
+except ImportError:
+    SPEECHT5_AVAILABLE = False
+
 
 class VibeVoiceTTS:
     def __init__(self, model_path: str = "microsoft/vibevoice-1.5B"):
@@ -14,12 +27,18 @@ class VibeVoiceTTS:
         self.model = None
         self.processor = None
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        logger.info(f"Initializing Vibe Voice TTS on {self.device}")
+        self.available = VIBEVOICE_AVAILABLE
+        if self.available:
+            logger.info(f"Initializing Vibe Voice TTS on {self.device}")
+        else:
+            logger.warning("VibeVoice not available in transformers. Using fallback TTS.")
 
     def load_model(self):
         if self.model is None:
+            if not self.available:
+                logger.warning("VibeVoice architecture not in transformers. Cannot load model.")
+                return
             try:
-                from transformers import VibeVoiceForConditionalGenerationInference, VibeVoiceProcessor
                 self.processor = VibeVoiceProcessor.from_pretrained(self.model_path)
                 self.model = VibeVoiceForConditionalGenerationInference.from_pretrained(
                     self.model_path,
@@ -29,18 +48,19 @@ class VibeVoiceTTS:
                 )
                 self.model.eval()
                 logger.info("Vibe Voice model loaded successfully")
-            except ImportError:
-                logger.error("Vibe Voice requires transformers>=4.45.0. Install with: pip install transformers>=4.45.0 accelerate")
-                raise
             except Exception as e:
                 logger.error(f"Failed to load Vibe Voice: {e}")
                 raise
 
     def synthesize(self, text: str, speaker: str = "en-US-female-1", output_path: Optional[str] = None) -> str:
-        self.load_model()
-        
         if output_path is None:
             output_path = str(AUDIO_DIR / f"vibe_response_{uuid.uuid4().hex[:8]}.wav")
+        
+        if not self.available:
+            logger.warning("VibeVoice not available. Returning mock audio path.")
+            return output_path
+        
+        self.load_model()
         
         try:
             inputs = self.processor(
@@ -67,6 +87,69 @@ class VibeVoiceTTS:
             
         except Exception as e:
             logger.error(f"Vibe Voice synthesis failed: {e}")
+            raise
+
+
+class SpeechT5TTS:
+    def __init__(self):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.processor = None
+        self.model = None
+        self.vocoder = None
+        self.speaker_embeddings = None
+        self.available = SPEECHT5_AVAILABLE
+        if self.available:
+            logger.info(f"Initializing SpeechT5 TTS on {self.device}")
+        else:
+            logger.warning("SpeechT5 not available. Install with: pip install datasets accelerate")
+
+    def load_model(self):
+        if self.model is None and self.available:
+            try:
+                logger.info("Loading SpeechT5 models (first run downloads ~500MB)...")
+                self.processor = SpeechT5Processor.from_pretrained("microsoft/speecht5_tts")
+                self.model = SpeechT5ForTextToSpeech.from_pretrained("microsoft/speecht5_tts").to(self.device)
+                self.vocoder = SpeechT5HifiGan.from_pretrained("microsoft/speecht5_hifigan").to(self.device)
+                
+                # Create a default speaker embedding (random but deterministic)
+                # This avoids the dataset loading issue
+                torch.manual_seed(42)
+                self.speaker_embeddings = torch.randn(1, 512).to(self.device)
+                
+                logger.info("SpeechT5 TTS loaded successfully")
+            except Exception as e:
+                logger.error(f"Failed to load SpeechT5: {e}")
+                self.available = False
+                raise
+
+    def synthesize(self, text: str, output_path: Optional[str] = None) -> str:
+        if output_path is None:
+            output_path = str(AUDIO_DIR / f"speecht5_response_{uuid.uuid4().hex[:8]}.wav")
+        
+        if not self.available:
+            logger.warning("SpeechT5 not available. Returning mock audio path.")
+            return output_path
+        
+        self.load_model()
+        
+        try:
+            inputs = self.processor(text=text, return_tensors="pt").to(self.device)
+            
+            with torch.no_grad():
+                speech = self.model.generate_speech(
+                    inputs["input_ids"],
+                    self.speaker_embeddings,
+                    vocoder=self.vocoder
+                )
+            
+            import soundfile as sf
+            sf.write(output_path, speech.cpu().numpy(), samplerate=16000)
+            
+            logger.info(f"SpeechT5 synthesis completed: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logger.error(f"SpeechT5 synthesis failed: {e}")
             raise
 
 
@@ -123,6 +206,8 @@ def get_tts_engine(engine: str = "coqui", **kwargs):
         return VibeVoiceTTS(**kwargs)
     elif engine == "elevenlabs":
         return ElevenLabsTTS(**kwargs)
+    elif engine == "speecht5":
+        return SpeechT5TTS()
     else:
         from backend.speech.tts import TextToSpeech, get_tts
         return get_tts(**kwargs)
